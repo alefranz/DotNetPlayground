@@ -29,17 +29,20 @@ namespace JsonLogging
             using var loggerFactory = LoggerFactory.Create(builder =>
             {
                 builder
-                    .AddConsole(o =>
-                    {
-                        o.FormatterName = "json";
-                        o.LogToStandardErrorThreshold = LogLevel.Trace;
-                    })
-                    .AddConsoleFormatter<MyJsonConsoleFormatter, JsonConsoleFormatterOptions>(o =>
-                    {
-                        o.IncludeScopes = true;
-                        o.JsonWriterOptions = new JsonWriterOptions { Indented = true };
-                        o.TimestampFormat = "o";
-                    })
+                    //.AddConsole(o =>
+                    //{
+                    //    o.FormatterName = "myjson";
+                    //    //o.FormatterName = "json";
+                    //    o.LogToStandardErrorThreshold = LogLevel.Trace;
+                    //    //o.IncludeScopes = true;
+                    //})
+                    //.AddConsoleFormatter<MyJsonConsoleFormatter, JsonConsoleFormatterOptions>(o =>
+                    //{
+                    //    o.IncludeScopes = true;
+                    //    //o.JsonWriterOptions = new JsonWriterOptions { Indented = false };
+                    //    o.JsonWriterOptions = new JsonWriterOptions { Indented = true };
+                    //    o.TimestampFormat = "o";
+                    //})
                     .AddSerilog(dispose: true);
             });
 
@@ -60,6 +63,31 @@ namespace JsonLogging
             {
                 logger.LogInformation(new Exception(), "exception message with {0} and {CustomNumber}", "stacktrace", 123);
             }
+
+            using (logger.BeginScope("This is a scope message with a {ScopeNumber}", 2))
+            {
+                logger.LogInformation("This is a message with a {Number}", 1);
+            }
+
+            using (logger.BeginScope("{Number}", 2))
+            using (logger.BeginScope("{AnotherNumber}", 3))
+            {
+                logger.LogInformation("{LogEntryNumber}", 1);
+            }
+
+            using (logger.BeginScope("{AnotherNumber}", 3))
+            using (logger.BeginScope("{Number}", 2))
+            {
+                logger.LogInformation("{LogEntryNumber}", 1);
+            }
+
+            using (logger.BeginScope("{@m}", 3))
+            using (logger.BeginScope("{{Message}}", 2))
+            {
+                logger.LogInformation("{LogEntryNumber}", 1);
+            }
+
+            logger.LogInformation("{LogEntryObject}", new {a=1, b=2 });
         }
     }
 
@@ -78,7 +106,7 @@ namespace JsonLogging
         private IDisposable _optionsReloadToken;
 
         public MyJsonConsoleFormatter(IOptionsMonitor<JsonConsoleFormatterOptions> options)
-            : base(ConsoleFormatterNames.Json)
+            : base("myjson")
         {
             ReloadLoggerOptions(options.CurrentValue);
             _optionsReloadToken = options.OnChange(ReloadLoggerOptions);
@@ -101,14 +129,12 @@ namespace JsonLogging
                 using (var writer = new Utf8JsonWriter(output, FormatterOptions.JsonWriterOptions))
                 {
                     writer.WriteStartObject();
-                    string timestamp = null;
                     var timestampFormat = FormatterOptions.TimestampFormat;
                     if (timestampFormat != null)
                     {
                         var dateTime = FormatterOptions.UseUtcTimestamp ? DateTime.UtcNow : DateTime.Now;
-                        timestamp = dateTime.ToString(timestampFormat);
+                        writer.WriteString("Timestamp", dateTime.ToString(timestampFormat));
                     }
-                    writer.WriteString("Timestamp", timestamp);
                     writer.WriteNumber(nameof(logEntry.EventId), eventId);
                     writer.WriteString(nameof(logEntry.LogLevel), GetLogLevelString(logLevel));
                     writer.WriteString(nameof(logEntry.Category), category);
@@ -123,10 +149,10 @@ namespace JsonLogging
                         string stackTrace = exception?.StackTrace;
                         if (stackTrace != null)
                         {
-#if (NETSTANDARD2_0 || NETFRAMEWORK)
-                            foreach (var stackTraceLines in stackTrace?.Split(new string[] { Environment.NewLine }, StringSplitOptions.None))
-#else
+#if NETCOREAPP
                             foreach (var stackTraceLines in stackTrace?.Split(Environment.NewLine))
+#else
+                            foreach (var stackTraceLines in stackTrace?.Split(new string[] { Environment.NewLine }, StringSplitOptions.None))
 #endif
                             {
                                 writer.WriteStringValue(stackTraceLines);
@@ -139,41 +165,28 @@ namespace JsonLogging
 
                     if (logEntry.State is IReadOnlyCollection<KeyValuePair<string, object>> stateDictionary)
                     {
+                        writer.WriteStartObject(nameof(logEntry.State));
                         foreach (KeyValuePair<string, object> item in stateDictionary)
                         {
-                            writer.WriteString(item.Key, Convert.ToString(item.Value, CultureInfo.InvariantCulture));
+                            writer.WriteString(item.Key, ToInvariantString(item.Value));
                         }
+                        writer.WriteEndObject();
+                    }
+                    else if (logEntry.State != null)
+                    {
+                        writer.WriteString(nameof(logEntry.State), logEntry.State.ToString());
                     }
                     WriteScopeInformation(writer, scopeProvider);
                     writer.WriteEndObject();
                     writer.Flush();
                 }
-#if (NETSTANDARD2_0 || NETFRAMEWORK)
-                textWriter.Write(Encoding.UTF8.GetString(output.WrittenMemory.Span.ToArray()));
-#else
+#if NETCOREAPP
                 textWriter.Write(Encoding.UTF8.GetString(output.WrittenMemory.Span));
+#else
+                textWriter.Write(Encoding.UTF8.GetString(output.WrittenMemory.Span.ToArray()));
 #endif
             }
             textWriter.Write(Environment.NewLine);
-        }
-
-        readonly struct LogEntryValues
-        {
-            string LogLevel { get; }
-            string Category { get; }
-            int EventId { get; }
-            LogEntryException Exception { get; }
-            string Timestamp { get; }
-            string Message { get; }
-            IReadOnlyCollection<KeyValuePair<string, object>> StateDictionary { get; }
-        }
-
-        readonly struct LogEntryException
-        {
-            string Message { get; }
-            string Type { get; }
-            string StackTrace { get; }
-            int HResult { get; }
         }
 
         private static string GetLogLevelString(LogLevel logLevel)
@@ -194,25 +207,28 @@ namespace JsonLogging
         {
             if (FormatterOptions.IncludeScopes && scopeProvider != null)
             {
-                int numScopes = 0;
-                writer.WriteStartObject("Scopes");
+                writer.WriteStartArray("Scopes");
                 scopeProvider.ForEachScope((scope, state) =>
                 {
-                    if (scope is IReadOnlyCollection<KeyValuePair<string, object>> scopeDictionary)
+                    if (scope is IReadOnlyCollection<KeyValuePair<string, object>> scopes)
                     {
-                        foreach (KeyValuePair<string, object> item in scopeDictionary)
+                        state.WriteStartObject();
+                        foreach (KeyValuePair<string, object> item in scopes)
                         {
-                            state.WriteString(item.Key, Convert.ToString(item.Value, CultureInfo.InvariantCulture));
+                            state.WriteString(item.Key, ToInvariantString(item.Value));
                         }
+                        state.WriteEndObject();
                     }
                     else
                     {
-                        state.WriteString(numScopes++.ToString(), scope.ToString());
+                        state.WriteStringValue(ToInvariantString(scope));
                     }
                 }, writer);
-                writer.WriteEndObject();
+                writer.WriteEndArray();
             }
         }
+
+        private static string ToInvariantString(object obj) => Convert.ToString(obj, CultureInfo.InvariantCulture);
 
         internal JsonConsoleFormatterOptions FormatterOptions { get; set; }
 
