@@ -11,6 +11,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JsonLogging", "JsonLogging\JsonLogging.csproj", "{3271C4F3-FF70-4502-B03E-B4B01B2DB0D5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Configuration", "Configuration\Configuration.csproj", "{3F3F0752-7684-48AB-BF4B-4ECEB46C339D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,12 +23,17 @@ Global
 		{3271C4F3-FF70-4502-B03E-B4B01B2DB0D5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3271C4F3-FF70-4502-B03E-B4B01B2DB0D5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3271C4F3-FF70-4502-B03E-B4B01B2DB0D5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F3F0752-7684-48AB-BF4B-4ECEB46C339D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F3F0752-7684-48AB-BF4B-4ECEB46C339D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F3F0752-7684-48AB-BF4B-4ECEB46C339D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F3F0752-7684-48AB-BF4B-4ECEB46C339D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{3271C4F3-FF70-4502-B03E-B4B01B2DB0D5} = {E0E143FF-E569-477A-9878-6920BCE690AB}
+		{3F3F0752-7684-48AB-BF4B-4ECEB46C339D} = {E0E143FF-E569-477A-9878-6920BCE690AB}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {5F6991C0-1259-4E19-B27A-F3419F0A884E}

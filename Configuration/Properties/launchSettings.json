@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Configuration": {
+      "commandName": "Project",
+      "commandLineArgs": "--key1:=1"
+    }
+  }
+}
